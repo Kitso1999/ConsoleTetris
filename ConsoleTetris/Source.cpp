@@ -3,6 +3,11 @@
 #include <Windows.h>
 
 
+
+//Game Properties
+const int BoardWidth = 10;
+const int BoardHeight = 20;
+
 //Main Game Objects*****************
 const char* tetrominoes[7] = 
 {
@@ -42,6 +47,22 @@ const char* tetrominoes[7] =
 	"...."
 };
 //**********************************
+
+int Rotate(int x, int y, int r)
+{
+	switch (r % 4)
+	{
+	case 0: return y * 4 + x;
+	case 1: return 3 - y + 4 * x;
+	case 2: return 15 - 4 * y - x;
+	case 3: return 12 + y - 4 * x;
+	}
+}
+
+bool DoesPieceFit(int r)
+{
+	return true;
+}
 
 int main()
 {
