@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <random>
+#include <vector>
 
 #include <Windows.h>
 
@@ -67,6 +68,15 @@ int CurrentPiece;
 int CurrentX;
 int CurrentY;
 int CurrentRotation;
+
+int SpeedCounter;
+int Speed;
+bool ForceDown;
+int NumberOfPieces;
+
+int Score;
+
+std::vector<int> Lines;
 //**********************************
 
 int Rotate(int x, int y, int r)
@@ -100,18 +110,22 @@ int main()
 {
 	//Game Variables Initialization
 	std::default_random_engine dre(time(NULL));
-	std::uniform_int_distribution<short> di(1, 7);
+	std::uniform_int_distribution<int> di(0, 6);
 
 	CurrentPiece = di(dre);
 	CurrentX = BoardWidth / 2 - 1;
 	CurrentY = 0;
 	CurrentRotation = 0;
-
+	SpeedCounter = 0;
+	Speed = 20;
+	NumberOfPieces = 1;
+	
 	GameBoard = new unsigned char [BoardWidth * BoardHeight];
 	for (int x = 0; x < BoardWidth; ++x)
 		for (int y = 0; y < BoardHeight; ++y)
 			GameBoard[y * BoardWidth + x] = (x == 0 || x == BoardWidth - 1 || y == BoardHeight - 1) ? 9 : 0;
 	//***************************************
+
 	//Screen Output Assets
 	wchar_t* screen = new wchar_t[ScreenWidth * ScreenHeight];
 	for (int i = 0; i < ScreenWidth * ScreenHeight; ++i) screen[i] = L' ';
@@ -123,10 +137,11 @@ int main()
 	bool GameOver = false;
 	while (!GameOver)
 	{
-		//Game Logic
+		
 		//Game Timing
 		std::this_thread::sleep_for(50ms);
-
+		++SpeedCounter;
+		ForceDown = (SpeedCounter == Speed);
 		//*****************************
 
 		//User Input
@@ -139,6 +154,72 @@ int main()
 		CurrentRotation += (bkey[3] && DoesPieceFit(CurrentPiece, CurrentX, CurrentY, CurrentRotation + 1));
 		//*****************************
 		
+		//Game Logic
+		if (ForceDown)
+		{
+			//If Can ForceDown Then Do It
+			if (DoesPieceFit(CurrentPiece, CurrentX, CurrentY + 1, CurrentRotation))
+			{
+				++CurrentY;
+			}
+			else
+			{
+				//If Not, Then:
+				//Lock The Tetromino
+				for (int x = 0; x < 4; ++x)
+					for (int y = 0; y < 4; ++y)
+						if (tetrominoes[CurrentPiece][Rotate(x, y, CurrentRotation)] == L'X')
+							GameBoard[(CurrentY + y) * BoardWidth + (CurrentX + x)] = CurrentPiece + 1;
+
+				//Test If There's Lines
+				for (int y = CurrentY; y < CurrentY + 4; ++y)
+					if (y < BoardHeight - 1 && y > 0)
+					{
+						bool IsLine = true;
+						for (int x = 1; x < BoardWidth - 1; ++x)
+						{
+							if (GameBoard[y * BoardWidth + x] == 0)
+							{
+								IsLine = false;
+								break;
+							}
+						}
+						if (IsLine)
+						{
+							for (int x = 1; x < BoardWidth - 1; ++x)
+								GameBoard[y * BoardWidth + x] = 8;
+							Lines.push_back(y);
+						}
+					}
+							
+
+
+
+				//Get a new Tetromino
+				CurrentPiece = di(dre);
+				CurrentX = BoardWidth / 2 - 1;
+				CurrentY = 0;
+				CurrentRotation = 0;
+
+				++NumberOfPieces;
+				if (NumberOfPieces % 10 == 0 && NumberOfPieces >= 10) //Ocassionally increase the game speed
+					--Speed;
+
+				//Scoring 
+				Score += 15;
+				if (!Lines.empty())
+					Score += (1 << Lines.size()) * 100;
+				//**************************
+
+				if (!DoesPieceFit(CurrentPiece, CurrentX, CurrentY, CurrentRotation))
+					break;
+			}
+			
+			SpeedCounter = 0;
+		}
+
+		//*****************************
+
 		//Screen Output
 		//Compose Frame
 		for (int x = 0; x < BoardWidth; ++x)
@@ -149,14 +230,34 @@ int main()
 			for (int y = 0; y < 4; ++y)
 				if (tetrominoes[CurrentPiece][Rotate(x, y, CurrentRotation)] == L'X')
 					screen[(CurrentY + y + 2) * ScreenWidth + (CurrentX + x + 2)] = CurrentPiece + 65;
+
 		//*****************************
 		
-		
+		if (!Lines.empty())
+		{
+			WriteConsoleOutputCharacter(hConsole, screen, ScreenWidth * ScreenHeight, { 0,0 }, &dwBytesWritten);
+			std::this_thread::sleep_for(400ms);
+
+			for(auto& v : Lines)
+				for (int x = 1; x < BoardWidth - 1; ++x)
+				{
+					for (int y = v; y > 0; --y)
+						GameBoard[y * BoardWidth + x] = GameBoard[(y - 1) * BoardWidth + x];
+					GameBoard[x] = 0;
+				}
+			Lines.clear();
+		}
 
 		//Draw Output
 		WriteConsoleOutputCharacter(hConsole, screen, ScreenWidth * ScreenHeight, { 0,0 }, &dwBytesWritten);
+		swprintf_s(&screen[6 * ScreenWidth + (2 + BoardWidth) + 6], 16, L"Score: %8d", Score);
 		//*****************************
 		//*********************************
 	}
-	
-}
+
+	CloseHandle(hConsole);
+	delete GameBoard;
+	GameBoard = nullptr;
+	std::cout << "Game Over! Final Score: " << Score << std::endl;
+	system("pause");
+ }
