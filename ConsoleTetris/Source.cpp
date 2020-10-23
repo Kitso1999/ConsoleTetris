@@ -11,8 +11,8 @@ using namespace std;
 const int BoardWidth = 10;
 const int BoardHeight = 18;
 
-int ScreenWidth = 80;
-int ScreenHeight = 30;
+const int ScreenWidth = 80;
+const int ScreenHeight = 30;
 
 //Main Game Objects*****************
 unsigned char* GameBoard = nullptr;
